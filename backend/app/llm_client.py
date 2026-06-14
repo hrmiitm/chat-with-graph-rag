@@ -114,3 +114,39 @@ def embed_single(text: str) -> list[float]:
     """Convenience: embed a single text and return the vector."""
     result = embed([text])
     return result["embeddings"][0]
+
+
+def parse_json_from_llm(text: str) -> any:
+    """Robustly parse JSON output from LLM, stripping thinking tags and wrapper text."""
+    import json
+    
+    # 1. Strip thinking tags if present
+    if "<think>" in text:
+        parts = text.split("</think>", 1)
+        if len(parts) > 1:
+            text = parts[1]
+        else:
+            text = text.replace("<think>", "").replace("</think>", "")
+            
+    # 2. Extract content between first '{' and last '}' or first '[' and last ']'
+    first_dict = text.find("{")
+    first_list = text.find("[")
+    
+    if first_dict != -1 and (first_list == -1 or first_dict < first_list):
+        # Starts with dict
+        start_idx = first_dict
+        end_idx = text.rfind("}")
+    elif first_list != -1:
+        # Starts with list
+        start_idx = first_list
+        end_idx = text.rfind("]")
+    else:
+        # No JSON structure found, try raw parse
+        return json.loads(text.strip())
+        
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        json_str = text[start_idx : end_idx + 1].strip()
+        return json.loads(json_str)
+        
+    return json.loads(text.strip())
+

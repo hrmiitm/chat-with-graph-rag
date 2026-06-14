@@ -75,12 +75,10 @@ def extract_question_entities(question: str) -> list[str]:
     prompt = QUESTION_ENTITY_PROMPT.format(question=question)
     result = generate(prompt, max_tokens=128)
     try:
-        text = result["text"]
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-        entities = json.loads(text)
+        from app.llm_client import parse_json_from_llm
+        entities = parse_json_from_llm(result["text"])
         return entities if isinstance(entities, list) else []
-    except (json.JSONDecodeError, ValueError):
+    except Exception:
         # Fallback: split question into significant words
         stop = {"what", "how", "why", "when", "where", "who", "is", "are", "the", "a", "an",
                 "in", "on", "of", "for", "to", "and", "or", "do", "does", "can", "will"}

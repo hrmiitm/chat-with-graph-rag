@@ -213,17 +213,43 @@ elif page == "🕸️ Knowledge Graph":
                     color="#888888",
                 ))
 
-            config = Config(
-                width=900,
-                height=600,
-                directed=True,
-                physics=True,
-                hierarchical=False,
-                nodeHighlightBehavior=True,
-                highlightColor="#F7A7A6",
-            )
+            tab_interactive, tab_svg = st.tabs(["🕸️ Interactive Graph", "🖼️ SVG Graph (Graphviz)"])
 
-            agraph(nodes=ag_nodes, edges=ag_edges, config=config)
+            with tab_interactive:
+                config = Config(
+                    width=900,
+                    height=600,
+                    directed=True,
+                    physics=True,
+                    hierarchical=False,
+                    nodeHighlightBehavior=True,
+                    highlightColor="#F7A7A6",
+                )
+                agraph(nodes=ag_nodes, edges=ag_edges, config=config)
+
+            with tab_svg:
+                # Build graphviz dot string
+                dot = "digraph {\n"
+                dot += '  graph [rankdir=LR, bgcolor="transparent", margin=0];\n'
+                dot += '  node [style=filled, fontname="Helvetica", shape=box, rx=5, ry=5, fontsize=11];\n'
+                dot += '  edge [fontname="Helvetica", fontsize=9, color="#888888"];\n'
+                
+                # Add nodes with colors
+                for n in nodes_data:
+                    name = n.get("name", "?")
+                    ntype = n.get("type", "Other")
+                    color = type_colors.get(ntype, "#C9C9C9")
+                    dot += f'  "{name}" [fillcolor="{color}", label="{name}\\n({ntype})"];\n'
+                    
+                # Add edges
+                for e in edges_data:
+                    source = e["source"]
+                    target = e["target"]
+                    relation = e["relation"]
+                    dot += f'  "{source}" -> "{target}" [label="{relation}"];\n'
+                    
+                dot += "}"
+                st.graphviz_chart(dot, use_container_width=True)
 
             # Legend
             st.divider()

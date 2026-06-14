@@ -94,11 +94,8 @@ def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict
 
         # Parse LLM JSON response
         try:
-            # Strip markdown code fences if present
-            text = result["text"]
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1].rsplit("```", 1)[0]
-            data = json.loads(text)
+            from app.llm_client import parse_json_from_llm
+            data = parse_json_from_llm(result["text"])
 
             for ent in data.get("entities", []):
                 all_entities.append({
@@ -115,7 +112,7 @@ def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict
                     "source_chunk": i,
                 })
 
-        except (json.JSONDecodeError, KeyError) as e:
+        except Exception as e:
             logger.warning(f"Failed to parse entities from chunk {i}: {e}")
             continue
 
