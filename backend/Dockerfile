@@ -1,7 +1,7 @@
 # FastAPI Backend for GraphRAG
 # Runs uvicorn on port 8001
 
-FROM python:3.11-slim
+FROM docker.io/library/python:3.11-slim
 
 WORKDIR /app
 

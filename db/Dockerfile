@@ -1,7 +1,7 @@
 # Custom PostgreSQL image with pgvector + Apache AGE extensions
 # Provides both vector similarity search and graph database capabilities
 
-FROM postgres:16
+FROM docker.io/library/postgres:16
 
 # Build dependencies for compiling extensions from source
 RUN apt-get update && apt-get install -y --no-install-recommends \

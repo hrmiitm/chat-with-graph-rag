@@ -27,7 +27,7 @@ services:
   # vLLM — serves Qwen3-4B as OpenAI-compatible API
   # ---------------------------------------------------------------------------
   vllm:
-    image: vllm/vllm-openai:latest
+    image: docker.io/vllm/vllm-openai:latest
     container_name: graphrag-vllm
     ports:
       - "8000:8000"
