@@ -1,0 +1,92 @@
+# GraphRAG Local Laptop Demo — Podman/Docker Compose
+# Usage: podman-compose up --build
+# Services: PostgreSQL (pgvector + AGE), vLLM, FastAPI backend, Streamlit UI
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL with pgvector + Apache AGE
+  # ---------------------------------------------------------------------------
+  db:
+    build: ./db
+    container_name: graphrag-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # vLLM — serves Qwen3-4B as OpenAI-compatible API
+  # ---------------------------------------------------------------------------
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: graphrag-vllm
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    # GPU passthrough — works with both Docker (--gpus) and Podman (CDI)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ipc: host
+    command: >
+      --model ${LLM_MODEL:-Qwen/Qwen3-4B}
+      --gpu-memory-utilization 0.85
+      --max-model-len 4096
+      --dtype auto
+      --trust-remote-code
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  # ---------------------------------------------------------------------------
+  # FastAPI Backend — ingestion, retrieval, chat
+  # ---------------------------------------------------------------------------
+  backend:
+    build: ./backend
+    container_name: graphrag-backend
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      VLLM_BASE_URL: http://vllm:8000/v1
+    depends_on:
+      db:
+        condition: service_healthy
+    # Note: vllm dependency removed — backend handles vllm unavailability gracefully
+    # This allows starting backend before vllm is ready (vllm takes 2+ minutes to load)
+
+  # ---------------------------------------------------------------------------
+  # Streamlit UI — demo frontend
+  # ---------------------------------------------------------------------------
+  ui:
+    build: ./ui
+    container_name: graphrag-ui
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_URL: http://backend:8001
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
