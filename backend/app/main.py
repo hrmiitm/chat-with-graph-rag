@@ -10,8 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import check_db_health, execute_sql, execute_cypher
-from app.llm_client import check_llm_health
+from app.database import check_db_health, execute_sql, execute_cypher, get_conn
+from app.llm_client import check_llm_health, warmup_embed_model
 from app.ingestion import router as ingest_router
 from app.retrieval import router as retrieval_router
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: verify DB connection. Shutdown: cleanup."""
+    """Startup: verify DB connection, warm up embedding model. Shutdown: cleanup."""
     logger.info("Starting GraphRAG backend...")
     logger.info(f"Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'configured'}")
     logger.info(f"LLM: {settings.llm_model} at {settings.vllm_base_url}")
@@ -39,6 +39,12 @@ async def lifespan(app: FastAPI):
         logger.info("✓ Database connected, extensions loaded (pgvector + AGE)")
     else:
         logger.warning("✗ Database not ready — will retry on first request")
+
+    # Warm up embedding model so first request is fast
+    try:
+        warmup_embed_model()
+    except Exception as e:
+        logger.warning(f"Embedding warmup failed (will retry on first use): {e}")
 
     yield
     logger.info("Shutting down GraphRAG backend.")
@@ -51,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GraphRAG API",
     description="Graph-enhanced RAG with pgvector + Apache AGE + vLLM",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -168,3 +174,23 @@ async def get_chat_history(user_id: str):
         (user_id,),
     )
     return {"history": rows}
+
+
+@app.delete("/api/reset")
+async def reset_all():
+    """Delete all data — documents, chunks, chat history, and graph. For demo use."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM chat_history")
+            cur.execute("DELETE FROM chunks")
+            cur.execute("DELETE FROM documents")
+        conn.commit()
+
+    # Clear graph
+    try:
+        execute_cypher("MATCH (n) DETACH DELETE n", columns="v agtype")
+    except Exception:
+        pass  # Graph might be empty
+
+    logger.info("All data reset")
+    return {"status": "ok", "message": "All data deleted"}

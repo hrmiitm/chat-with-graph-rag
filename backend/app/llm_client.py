@@ -6,13 +6,27 @@ LLM and Embedding clients.
 Both track and return token usage for frontend debugging.
 """
 
+import json
 import logging
+import re
 import time
 from openai import OpenAI
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Think-tag stripping (Qwen3 reasoning models wrap output in <think>...</think>)
+# ---------------------------------------------------------------------------
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def strip_think_tags(text: str) -> str:
+    """Remove <think>...</think> blocks from LLM output."""
+    return _THINK_RE.sub("", text).strip()
+
 
 # ---------------------------------------------------------------------------
 # vLLM client for chat/generation (GPU)
@@ -33,7 +47,8 @@ def _get_llm_client() -> OpenAI:
 def generate(prompt: str, system: str = "", max_tokens: int = 1024) -> dict:
     """
     Generate text using the LLM via vLLM's OpenAI-compatible API.
-    
+    Automatically strips <think> tags from output.
+
     Returns:
         {"text": str, "prompt_tokens": int, "completion_tokens": int, "latency_s": float}
     """
@@ -51,8 +66,10 @@ def generate(prompt: str, system: str = "", max_tokens: int = 1024) -> dict:
             temperature=0.3,
         )
         latency = time.time() - start
+        raw_text = resp.choices[0].message.content.strip()
+        clean_text = strip_think_tags(raw_text)
         return {
-            "text": resp.choices[0].message.content.strip(),
+            "text": clean_text,
             "prompt_tokens": resp.usage.prompt_tokens if resp.usage else 0,
             "completion_tokens": resp.usage.completion_tokens if resp.usage else 0,
             "latency_s": round(latency, 3),
@@ -93,10 +110,16 @@ def _get_embed_model():
     return _embed_model
 
 
+def warmup_embed_model():
+    """Force-load the embedding model so first real request isn't slow."""
+    _get_embed_model()
+    logger.info("Embedding model warmed up")
+
+
 def embed(texts: list[str]) -> dict:
     """
     Generate embeddings for a list of texts.
-    
+
     Returns:
         {"embeddings": list[list[float]], "latency_s": float}
     """
@@ -118,35 +141,24 @@ def embed_single(text: str) -> list[float]:
 
 def parse_json_from_llm(text: str) -> any:
     """Robustly parse JSON output from LLM, stripping thinking tags and wrapper text."""
-    import json
-    
-    # 1. Strip thinking tags if present
-    if "<think>" in text:
-        parts = text.split("</think>", 1)
-        if len(parts) > 1:
-            text = parts[1]
-        else:
-            text = text.replace("<think>", "").replace("</think>", "")
-            
+    # 1. Strip thinking tags (already done by generate(), but just in case)
+    text = strip_think_tags(text)
+
     # 2. Extract content between first '{' and last '}' or first '[' and last ']'
     first_dict = text.find("{")
     first_list = text.find("[")
-    
+
     if first_dict != -1 and (first_list == -1 or first_dict < first_list):
-        # Starts with dict
         start_idx = first_dict
         end_idx = text.rfind("}")
     elif first_list != -1:
-        # Starts with list
         start_idx = first_list
         end_idx = text.rfind("]")
     else:
-        # No JSON structure found, try raw parse
         return json.loads(text.strip())
-        
+
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         json_str = text[start_idx : end_idx + 1].strip()
         return json.loads(json_str)
-        
-    return json.loads(text.strip())
 
+    return json.loads(text.strip())

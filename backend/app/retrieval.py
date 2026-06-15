@@ -1,25 +1,23 @@
 """
-Retrieval pipeline — hybrid search with full pipeline debugging:
-1. Vector search (pgvector cosine similarity)
-2. BM25 search (PostgreSQL full-text search with ts_rank)
-3. Graph search (Apache AGE — find related entities/facts)
-4. RRF fusion (merge vector + BM25 rankings)
-5. Graph boosting (boost chunks that mention graph-connected entities)
-6. Answer generation (LLM with merged context)
+GraphRAG retrieval pipeline:
+1. Embed the question (sentence-transformers on CPU)
+2. Vector search (pgvector cosine similarity → find relevant chunks)
+3. Extract entities from question (LLM)
+4. Graph search (Apache AGE — traverse knowledge graph for related facts)
+5. Build context (merge chunks + graph facts)
+6. Generate answer (LLM with full context)
 
-Every step's results and scores are returned for frontend display.
+Every step's results, scores, and timing are returned for frontend debugging.
 """
 
-import json
 import logging
 import time
 
 from fastapi import APIRouter
-from rank_bm25 import BM25Okapi
 
 from app.config import settings
 from app.database import execute_sql, execute_cypher, get_conn
-from app.llm_client import embed_single, generate
+from app.llm_client import embed_single, generate, parse_json_from_llm
 from app.prompts import ANSWER_SYSTEM, ANSWER_PROMPT, QUESTION_ENTITY_PROMPT
 from app.models import (
     ChatRequest, ChatResponse, RetrievedChunk,
@@ -49,40 +47,26 @@ def vector_search(query_embedding: list[float], top_k: int) -> list[dict]:
 
 
 # =============================================================================
-# BM25 Search (PostgreSQL full-text search)
-# =============================================================================
-
-def bm25_search(query: str, top_k: int) -> list[dict]:
-    """Full-text search using PostgreSQL's built-in ts_rank (BM25-style scoring)."""
-    sql = """
-        SELECT c.id, c.content, c.chunk_index, d.filename,
-               ts_rank_cd(c.tsv, plainto_tsquery('english', %s)) AS bm25_score
-        FROM chunks c
-        JOIN documents d ON c.doc_id = d.id
-        WHERE c.tsv @@ plainto_tsquery('english', %s)
-        ORDER BY bm25_score DESC
-        LIMIT %s
-    """
-    return execute_sql(sql, (query, query, top_k))
-
-
-# =============================================================================
 # Graph Search (Apache AGE)
 # =============================================================================
 
 def extract_question_entities(question: str) -> list[str]:
     """Use LLM to extract searchable entity names from the question."""
     prompt = QUESTION_ENTITY_PROMPT.format(question=question)
-    result = generate(prompt, max_tokens=1024)
+    result = generate(prompt, max_tokens=512)
     try:
-        from app.llm_client import parse_json_from_llm
         entities = parse_json_from_llm(result["text"])
-        return entities if isinstance(entities, list) else []
+        if isinstance(entities, list):
+            logger.info(f"Extracted question entities: {entities}")
+            return entities
+        return []
     except Exception:
         # Fallback: split question into significant words
         stop = {"what", "how", "why", "when", "where", "who", "is", "are", "the", "a", "an",
                 "in", "on", "of", "for", "to", "and", "or", "do", "does", "can", "will"}
-        return [w for w in question.lower().split() if w not in stop and len(w) > 2]
+        words = [w for w in question.lower().split() if w not in stop and len(w) > 2]
+        logger.info(f"Fallback question entities: {words}")
+        return words
 
 
 def graph_search(entities: list[str]) -> list[dict]:
@@ -109,7 +93,7 @@ def graph_search(entities: list[str]) -> list[dict]:
                     facts.append(row)
         except Exception as e:
             logger.warning(f"Graph search failed for entity '{entity}': {e}")
-    
+
     # Deduplicate
     seen = set()
     unique = []
@@ -122,94 +106,57 @@ def graph_search(entities: list[str]) -> list[dict]:
 
 
 # =============================================================================
-# Reciprocal Rank Fusion (RRF)
-# =============================================================================
-
-def rrf_merge(vector_results: list[dict], bm25_results: list[dict],
-              k: int = 60) -> list[dict]:
-    """
-    Merge vector and BM25 results using Reciprocal Rank Fusion.
-    RRF score = sum(1 / (k + rank)) across all lists.
-    Uses rank position, not raw scores — handles different score scales.
-    """
-    scores = {}      # chunk_id -> rrf_score
-    chunk_map = {}   # chunk_id -> chunk data
-
-    for rank, r in enumerate(vector_results):
-        cid = r["id"]
-        scores[cid] = scores.get(cid, 0) + 1.0 / (k + rank + 1)
-        chunk_map[cid] = r
-
-    for rank, r in enumerate(bm25_results):
-        cid = r["id"]
-        scores[cid] = scores.get(cid, 0) + 1.0 / (k + rank + 1)
-        chunk_map[cid] = r
-
-    # Sort by RRF score descending
-    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-    results = []
-    for cid, rrf_score in ranked:
-        data = chunk_map[cid]
-        data["rrf_score"] = round(rrf_score, 6)
-        results.append(data)
-
-    return results
-
-
-# =============================================================================
 # Chat Endpoint
 # =============================================================================
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     """
-    Hybrid GraphRAG retrieval + answer generation.
+    GraphRAG retrieval + answer generation.
+    Pipeline: embed → vector search → graph search → generate answer.
     Returns answer with full pipeline debug info.
     """
     timing = {}
     total_tokens = {"prompt_tokens": 0, "completion_tokens": 0}
+    logger.info(f"═══ CHAT QUERY: '{req.question}' (user={req.user_id}) ═══")
 
-    # 1. Embed the question
+    # Step 1: Embed the question
     t0 = time.time()
     q_embedding = embed_single(req.question)
     timing["embed_query_s"] = round(time.time() - t0, 3)
+    logger.info(f"[Step 1/4] Query embedded in {timing['embed_query_s']}s")
 
-    # 2. Vector search
+    # Step 2: Vector search — find relevant chunks
     t0 = time.time()
     vec_results = vector_search(q_embedding, settings.top_k)
     timing["vector_search_s"] = round(time.time() - t0, 3)
+    logger.info(f"[Step 2/4] Vector search: {len(vec_results)} results in {timing['vector_search_s']}s")
 
-    # 3. BM25 search
-    t0 = time.time()
-    bm25_results = bm25_search(req.question, settings.top_k)
-    timing["bm25_search_s"] = round(time.time() - t0, 3)
-
-    # 4. Graph search
+    # Step 3: Graph search — extract entities from question, then traverse graph
     t0 = time.time()
     q_entities = extract_question_entities(req.question)
     graph_facts = graph_search(q_entities)
     timing["graph_search_s"] = round(time.time() - t0, 3)
+    logger.info(f"[Step 3/4] Graph search: {len(graph_facts)} facts for entities {q_entities} "
+                f"in {timing['graph_search_s']}s")
 
-    # 5. RRF Fusion
-    t0 = time.time()
-    merged = rrf_merge(vec_results, bm25_results, k=settings.rrf_k)
-    timing["rrf_merge_s"] = round(time.time() - t0, 3)
-
-    # 6. Graph boosting — mark chunks that contain graph-connected entities
+    # Graph boosting — mark chunks that contain graph-connected entities
     graph_entity_names = set()
     for f in graph_facts:
         graph_entity_names.add(f["source"].lower())
         graph_entity_names.add(f["target"].lower())
 
-    for item in merged:
+    for item in vec_results:
         content_lower = item["content"].lower()
         item["graph_boosted"] = any(e in content_lower for e in graph_entity_names)
 
-    # Take top K for context
-    top_chunks = merged[: settings.top_k]
+    # Sort: graph-boosted chunks first, then by cosine score
+    vec_results.sort(key=lambda x: (x.get("graph_boosted", False), x.get("cosine_score", 0)), reverse=True)
 
-    # 7. Build context and generate answer
+    # Take top K for context
+    top_chunks = vec_results[: settings.top_k]
+
+    # Step 4: Build context and generate answer
     t0 = time.time()
     context_str = "\n\n".join(
         f"[Chunk {i}] (from {c['filename']}):\n{c['content']}"
@@ -229,36 +176,36 @@ async def chat(req: ChatRequest):
     total_tokens["prompt_tokens"] += answer_result["prompt_tokens"]
     total_tokens["completion_tokens"] += answer_result["completion_tokens"]
     timing["generation_s"] = answer_result["latency_s"]
-
     total_tokens["total"] = total_tokens["prompt_tokens"] + total_tokens["completion_tokens"]
 
-    # 8. Save chat history
+    logger.info(f"[Step 4/4] Answer generated in {timing['generation_s']}s "
+                f"({total_tokens['total']} tokens)")
+
+    # Save chat history
     _save_chat(req.user_id, req.question, answer_result["text"])
 
-    # 9. Build response with full debug info
-    def _to_retrieved(r, stage) -> RetrievedChunk:
+    # Build response with full debug info
+    def _to_retrieved(r) -> RetrievedChunk:
         return RetrievedChunk(
             chunk_id=r["id"],
             content=r["content"],
             doc_filename=r.get("filename", ""),
             vector_score=round(r["cosine_score"], 4) if "cosine_score" in r else None,
-            bm25_score=round(r["bm25_score"], 4) if "bm25_score" in r else None,
-            rrf_score=round(r["rrf_score"], 6) if "rrf_score" in r else None,
             graph_boosted=r.get("graph_boosted", False),
         )
 
     debug = PipelineDebug(
-        vector_results=[_to_retrieved(r, "vector") for r in vec_results],
-        bm25_results=[_to_retrieved(r, "bm25") for r in bm25_results],
-        rrf_merged=[_to_retrieved(r, "rrf") for r in merged],
+        vector_results=[_to_retrieved(r) for r in vec_results],
         graph_facts=[GraphFact(**f) for f in graph_facts],
+        question_entities=q_entities,
         token_usage=total_tokens,
         timing=timing,
     )
 
+    logger.info(f"═══ CHAT COMPLETE ═══")
     return ChatResponse(
         answer=answer_result["text"],
-        sources=[_to_retrieved(r, "final") for r in top_chunks],
+        sources=[_to_retrieved(r) for r in top_chunks],
         debug=debug,
     )
 

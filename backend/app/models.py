@@ -55,13 +55,11 @@ class ChatRequest(BaseModel):
 
 
 class RetrievedChunk(BaseModel):
-    """A chunk retrieved by one or more search methods, with all scores."""
+    """A chunk retrieved by vector search, with scores."""
     chunk_id: int
     content: str
     doc_filename: str
     vector_score: Optional[float] = None     # cosine similarity
-    bm25_score: Optional[float] = None       # BM25 score
-    rrf_score: Optional[float] = None        # Reciprocal Rank Fusion score
     graph_boosted: bool = False              # whether graph context boosted this chunk
 
 
@@ -73,12 +71,13 @@ class GraphFact(BaseModel):
 
 
 class PipelineDebug(BaseModel):
-    """Complete debug info for every retrieval step — shown in frontend."""
-    # Search results at each stage
+    """Complete debug info for the GraphRAG retrieval pipeline."""
+    # Search results
     vector_results: list[RetrievedChunk]
-    bm25_results: list[RetrievedChunk]
-    rrf_merged: list[RetrievedChunk]
     graph_facts: list[GraphFact]
+
+    # Entities extracted from the question (used for graph search)
+    question_entities: list[str] = []
 
     # Token usage for this query
     token_usage: dict

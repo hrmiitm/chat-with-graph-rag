@@ -20,8 +20,8 @@ from docx import Document as DocxDocument
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from app.config import settings
-from app.database import execute_sql_returning, execute_cypher, get_conn
-from app.llm_client import embed, generate
+from app.database import execute_sql_returning, execute_sql, execute_cypher, get_conn
+from app.llm_client import embed, generate, parse_json_from_llm
 from app.prompts import ENTITY_EXTRACTION_SYSTEM, ENTITY_EXTRACTION_PROMPT
 from app.models import IngestResponse, ChunkInfo, EntityInfo, RelationInfo
 
@@ -78,7 +78,6 @@ def chunk_text(text: str) -> list[str]:
 def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict], dict]:
     """
     Use LLM to extract entities and relations from each chunk.
-    
     Returns: (entities, relations, token_usage)
     """
     all_entities = []
@@ -86,35 +85,43 @@ def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict
     total_tokens = {"prompt_tokens": 0, "completion_tokens": 0}
 
     for i, chunk in enumerate(chunks):
+        logger.info(f"[Chunk {i}/{len(chunks)-1}] Extracting entities...")
         prompt = ENTITY_EXTRACTION_PROMPT.format(chunk_text=chunk)
         result = generate(prompt, system=ENTITY_EXTRACTION_SYSTEM, max_tokens=2048)
-        logger.info(f"--- Chunk {i} LLM Output ---\n{result['text']}\n------------------")
 
         total_tokens["prompt_tokens"] += result["prompt_tokens"]
         total_tokens["completion_tokens"] += result["completion_tokens"]
 
+        logger.info(f"[Chunk {i}] LLM response ({result['latency_s']}s, "
+                     f"{result['completion_tokens']} tokens):\n{result['text'][:500]}")
+
         # Parse LLM JSON response
         try:
-            from app.llm_client import parse_json_from_llm
             data = parse_json_from_llm(result["text"])
 
+            chunk_entities = []
             for ent in data.get("entities", []):
-                all_entities.append({
+                chunk_entities.append({
                     "name": ent["name"],
                     "entity_type": ent.get("type", "Other"),
                     "source_chunk": i,
                 })
 
+            chunk_relations = []
             for rel in data.get("relations", []):
-                all_relations.append({
+                chunk_relations.append({
                     "source": rel["source"],
                     "relation": rel["relation"],
                     "target": rel["target"],
                     "source_chunk": i,
                 })
 
+            all_entities.extend(chunk_entities)
+            all_relations.extend(chunk_relations)
+            logger.info(f"[Chunk {i}] ✓ {len(chunk_entities)} entities, {len(chunk_relations)} relations")
+
         except Exception as e:
-            logger.warning(f"Failed to parse entities from chunk {i}: {e}")
+            logger.warning(f"[Chunk {i}] ✗ Failed to parse entities: {e}")
             continue
 
     total_tokens["total"] = total_tokens["prompt_tokens"] + total_tokens["completion_tokens"]
@@ -127,6 +134,9 @@ def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict
 
 def store_graph(entities: list[dict], relations: list[dict]):
     """Store extracted entities and relations in the Apache AGE knowledge graph."""
+    created_nodes = 0
+    created_edges = 0
+
     # Create entity nodes (MERGE to avoid duplicates)
     for ent in entities:
         name = ent["name"].replace("'", "\\'")
@@ -134,6 +144,7 @@ def store_graph(entities: list[dict], relations: list[dict]):
         cypher = f"MERGE (n:Entity {{name: '{name}', type: '{etype}'}})"
         try:
             execute_cypher(cypher, columns="v agtype")
+            created_nodes += 1
         except Exception as e:
             logger.warning(f"Failed to create entity node '{name}': {e}")
 
@@ -148,8 +159,11 @@ def store_graph(entities: list[dict], relations: list[dict]):
         )
         try:
             execute_cypher(cypher, columns="e agtype")
+            created_edges += 1
         except Exception as e:
             logger.warning(f"Failed to create relation {src}->{tgt}: {e}")
+
+    logger.info(f"Graph stored: {created_nodes} nodes, {created_edges} edges")
 
 
 # =============================================================================
@@ -163,7 +177,14 @@ async def ingest_document(file: UploadFile = File(...)):
     extract text → chunk → embed → extract entities → store in DB + graph.
     """
     timing = {}
-    logger.info(f"Ingesting document: {file.filename}")
+    logger.info(f"═══ INGESTION START: {file.filename} ═══")
+
+    # 0. Check for duplicate
+    existing = execute_sql(
+        "SELECT id FROM documents WHERE filename = %s", (file.filename,)
+    )
+    if existing:
+        logger.info(f"Document '{file.filename}' already exists (id={existing[0]['id']}), will re-ingest")
 
     # 1. Extract text
     t0 = time.time()
@@ -172,6 +193,7 @@ async def ingest_document(file: UploadFile = File(...)):
     if not text.strip():
         raise HTTPException(400, "No text could be extracted from the file.")
     timing["extraction_s"] = round(time.time() - t0, 3)
+    logger.info(f"[Step 1/6] Text extracted: {len(text)} chars in {timing['extraction_s']}s")
 
     # 2. Store document
     doc = execute_sql_returning(
@@ -179,18 +201,20 @@ async def ingest_document(file: UploadFile = File(...)):
         (file.filename, text),
     )
     doc_id = doc["id"]
+    logger.info(f"[Step 2/6] Document stored: id={doc_id}")
 
     # 3. Chunk text
     t0 = time.time()
     chunks = chunk_text(text)
     timing["chunking_s"] = round(time.time() - t0, 3)
-    logger.info(f"Created {len(chunks)} chunks from {file.filename}")
+    logger.info(f"[Step 3/6] Chunked: {len(chunks)} chunks in {timing['chunking_s']}s")
 
     # 4. Generate embeddings
     t0 = time.time()
     embed_result = embed(chunks)
     embeddings = embed_result["embeddings"]
     timing["embedding_s"] = embed_result["latency_s"]
+    logger.info(f"[Step 4/6] Embeddings generated: {len(embeddings)} vectors in {timing['embedding_s']}s")
 
     # 5. Store chunks + embeddings in pgvector
     t0 = time.time()
@@ -210,17 +234,24 @@ async def ingest_document(file: UploadFile = File(...)):
                 ))
         conn.commit()
     timing["db_store_s"] = round(time.time() - t0, 3)
+    logger.info(f"[Step 5/6] Chunks stored in pgvector in {timing['db_store_s']}s")
 
     # 6. Extract entities & relations via LLM
     t0 = time.time()
     entities, relations, token_usage = extract_entities_relations(chunks)
     timing["graph_extraction_s"] = round(time.time() - t0, 3)
-    logger.info(f"Extracted {len(entities)} entities, {len(relations)} relations")
+    logger.info(f"[Step 6a/6] Extracted {len(entities)} entities, {len(relations)} relations "
+                f"in {timing['graph_extraction_s']}s")
 
     # 7. Store in Apache AGE graph
     t0 = time.time()
     store_graph(entities, relations)
     timing["graph_store_s"] = round(time.time() - t0, 3)
+    logger.info(f"[Step 6b/6] Graph stored in {timing['graph_store_s']}s")
+
+    logger.info(f"═══ INGESTION COMPLETE: {file.filename} ═══")
+    logger.info(f"  Chunks: {len(chunks)}, Entities: {len(entities)}, "
+                f"Relations: {len(relations)}, Tokens: {token_usage.get('total', 0)}")
 
     return IngestResponse(
         document_id=doc_id,
