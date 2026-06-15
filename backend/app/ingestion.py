@@ -87,7 +87,8 @@ def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict
 
     for i, chunk in enumerate(chunks):
         prompt = ENTITY_EXTRACTION_PROMPT.format(chunk_text=chunk)
-        result = generate(prompt, system=ENTITY_EXTRACTION_SYSTEM, max_tokens=512)
+        result = generate(prompt, system=ENTITY_EXTRACTION_SYSTEM, max_tokens=2048)
+        logger.info(f"--- Chunk {i} LLM Output ---\n{result['text']}\n------------------")
 
         total_tokens["prompt_tokens"] += result["prompt_tokens"]
         total_tokens["completion_tokens"] += result["completion_tokens"]
@@ -100,7 +101,7 @@ def extract_entities_relations(chunks: list[str]) -> tuple[list[dict], list[dict
             for ent in data.get("entities", []):
                 all_entities.append({
                     "name": ent["name"],
-                    "type": ent.get("type", "Other"),
+                    "entity_type": ent.get("type", "Other"),
                     "source_chunk": i,
                 })
 
@@ -129,7 +130,7 @@ def store_graph(entities: list[dict], relations: list[dict]):
     # Create entity nodes (MERGE to avoid duplicates)
     for ent in entities:
         name = ent["name"].replace("'", "\\'")
-        etype = ent["type"].replace("'", "\\'")
+        etype = ent["entity_type"].replace("'", "\\'")
         cypher = f"MERGE (n:Entity {{name: '{name}', type: '{etype}'}})"
         try:
             execute_cypher(cypher, columns="v agtype")

@@ -73,7 +73,7 @@ def bm25_search(query: str, top_k: int) -> list[dict]:
 def extract_question_entities(question: str) -> list[str]:
     """Use LLM to extract searchable entity names from the question."""
     prompt = QUESTION_ENTITY_PROMPT.format(question=question)
-    result = generate(prompt, max_tokens=128)
+    result = generate(prompt, max_tokens=1024)
     try:
         from app.llm_client import parse_json_from_llm
         entities = parse_json_from_llm(result["text"])
@@ -225,7 +225,7 @@ async def chat(req: ChatRequest):
         graph_facts=graph_str,
         question=req.question,
     )
-    answer_result = generate(prompt, system=ANSWER_SYSTEM, max_tokens=1024)
+    answer_result = generate(prompt, system=ANSWER_SYSTEM, max_tokens=2048)
     total_tokens["prompt_tokens"] += answer_result["prompt_tokens"]
     total_tokens["completion_tokens"] += answer_result["completion_tokens"]
     timing["generation_s"] = answer_result["latency_s"]
