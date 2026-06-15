@@ -194,3 +194,20 @@ async def reset_all():
 
     logger.info("All data reset")
     return {"status": "ok", "message": "All data deleted"}
+
+
+@app.delete("/api/documents/{doc_id}")
+async def delete_document(doc_id: int):
+    """Delete a single document and its associated chunks (via cascade)."""
+    execute_sql("DELETE FROM documents WHERE id = %s", (doc_id,))
+    logger.info(f"Document {doc_id} deleted")
+    return {"status": "ok", "message": f"Document {doc_id} deleted"}
+
+
+@app.delete("/api/chat_history/{user_id}")
+async def clear_chat_history(user_id: str):
+    """Clear chat history for a specific user."""
+    execute_sql("DELETE FROM chat_history WHERE user_id = %s", (user_id,))
+    logger.info(f"Chat history for user '{user_id}' cleared")
+    return {"status": "ok", "message": f"Chat history for user '{user_id}' cleared"}
+
