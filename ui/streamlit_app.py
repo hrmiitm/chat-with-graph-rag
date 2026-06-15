@@ -404,8 +404,25 @@ def inject_custom_css(theme_name):
         box-shadow: 0 0 10px var(--accent-col) !important;
     }}
     
+    /* --- File Uploader Overrides --- */
+    [data-testid="stFileUploader"] {{
+        background-color: var(--card-bg) !important;
+        border: var(--card-border) !important;
+        border-radius: 12px !important;
+        padding: 20px !important;
+    }}
+    [data-testid="stFileUploader"] section {{
+        background-color: transparent !important;
+        border: 1px dashed var(--accent-col) !important;
+        border-radius: 8px !important;
+    }}
+    [data-testid="stFileUploader"] label {{
+        color: var(--text-col) !important;
+        font-weight: 600 !important;
+    }}
+    
     /* --- Graph Iframe Alignment & Transparency Filter --- */
-    iframe[title="streamlit_agraph.agraph"] {{
+    iframe[title*="streamlit_agraph"] {{
         background-color: transparent !important;
         background: transparent !important;
         border: var(--card-border) !important;
@@ -414,8 +431,15 @@ def inject_custom_css(theme_name):
         filter: var(--graph-filter) !important;
     }}
     
+    iframe {{
+        background-color: transparent !important;
+        background: transparent !important;
+        filter: var(--graph-filter) !important;
+    }}
+    
     </style>
     """, unsafe_allow_html=True)
+
 
 
 # =============================================================================
@@ -664,12 +688,11 @@ elif page == "🕸️ Knowledge Graph":
         if not nodes_data:
             st.info("No entities in the knowledge graph yet. Ingest a document first!")
         else:
-            # Layout & Inspection columns
-            col_controls, col_legend = st.columns([3, 1])
-            with col_controls:
-                layout_type = st.radio("Graph Layout", ["Forced-Directed", "Hierarchical", "Circular"], horizontal=True)
-            with col_legend:
-                render_legend()
+            # Layout options
+            layout_type = st.radio("Graph Layout", ["Forced-Directed", "Hierarchical", "Circular"], horizontal=True)
+            
+            # Legend on its own full-width row
+            render_legend()
             
             st.divider()
 
