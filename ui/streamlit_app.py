@@ -37,7 +37,7 @@ THEMES = {
         "sidebar_gradient": "linear-gradient(180deg, #17172e 0%, #0f0c29 100%)",
         "text_color": "#e2e8f0",
         "card_bg": "rgba(255, 255, 255, 0.04)",
-        "card_border": "1px solid rgba(0, 210, 255, 0.15)",
+        "card_border": "1px solid rgba(0, 210, 255, 0.18)",
         "accent_color": "#00d2ff",
         "accent_hover": "#3a7bd5",
         "metric_val_gradient": "linear-gradient(135deg, #00d2ff, #3a7bd5)",
@@ -45,52 +45,64 @@ THEMES = {
         "chat_user_border": "1px solid rgba(0, 210, 255, 0.3)",
         "chat_bot_bg": "rgba(255, 255, 255, 0.05)",
         "chat_bot_border": "1px solid rgba(255, 255, 255, 0.08)",
-        "header_color": "#00d2ff"
+        "header_color": "#00d2ff",
+        "tag_bg": "rgba(0, 210, 255, 0.15)",
+        "tag_text": "#00d2ff",
+        "graph_filter": "invert(0.9) hue-rotate(180deg) contrast(1.2)"
     },
     "☀️ Clean Studio (Light Mode)": {
-        "bg_gradient": "linear-gradient(135deg, #f4f6f9 0%, #ffffff 50%, #eaeef3 100%)",
-        "sidebar_gradient": "linear-gradient(180deg, #e4e8f0 0%, #dbe0eb 100%)",
-        "text_color": "#1e293b",
+        "bg_gradient": "linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f1f5f9 100%)",
+        "sidebar_gradient": "linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%)",
+        "text_color": "#0f172a",
         "card_bg": "#ffffff",
-        "card_border": "1px solid rgba(58, 123, 213, 0.15)",
+        "card_border": "1px solid rgba(58, 123, 213, 0.25)",
         "accent_color": "#3a7bd5",
-        "accent_hover": "#2563eb",
-        "metric_val_gradient": "linear-gradient(135deg, #3a7bd5, #1e293b)",
+        "accent_hover": "#1d4ed8",
+        "metric_val_gradient": "linear-gradient(135deg, #3a7bd5, #0f172a)",
         "chat_user_bg": "rgba(58, 123, 213, 0.08)",
-        "chat_user_border": "1px solid rgba(58, 123, 213, 0.25)",
-        "chat_bot_bg": "#f8fafc",
-        "chat_bot_border": "1px solid rgba(0, 0, 0, 0.06)",
-        "header_color": "#1e293b"
+        "chat_user_border": "1px solid rgba(58, 123, 213, 0.3)",
+        "chat_bot_bg": "#ffffff",
+        "chat_bot_border": "1px solid rgba(0, 0, 0, 0.1)",
+        "header_color": "#0f172a",
+        "tag_bg": "rgba(58, 123, 213, 0.12)",
+        "tag_text": "#3a7bd5",
+        "graph_filter": "none"
     },
     "🍇 Cyberpunk Purple": {
-        "bg_gradient": "linear-gradient(135deg, #120324 0%, #080014 50%, #1e053a 100%)",
-        "sidebar_gradient": "linear-gradient(180deg, #080014 0%, #120324 100%)",
-        "text_color": "#fbcfe8",
-        "card_bg": "rgba(236, 72, 153, 0.06)",
-        "card_border": "1px solid rgba(236, 72, 153, 0.3)",
+        "bg_gradient": "linear-gradient(135deg, #0d0118 0%, #120224 50%, #090012 100%)",
+        "sidebar_gradient": "linear-gradient(180deg, #120224 0%, #0d0118 100%)",
+        "text_color": "#fdf2f8",
+        "card_bg": "rgba(236, 72, 153, 0.05)",
+        "card_border": "1px solid rgba(236, 72, 153, 0.35)",
         "accent_color": "#ec4899",
         "accent_hover": "#db2777",
         "metric_val_gradient": "linear-gradient(135deg, #ec4899, #a855f7)",
         "chat_user_bg": "rgba(236, 72, 153, 0.15)",
         "chat_user_border": "1px solid rgba(236, 72, 153, 0.4)",
-        "chat_bot_bg": "rgba(255, 255, 255, 0.03)",
+        "chat_bot_bg": "rgba(255, 255, 255, 0.02)",
         "chat_bot_border": "1px solid rgba(255, 255, 255, 0.08)",
-        "header_color": "#ec4899"
+        "header_color": "#ec4899",
+        "tag_bg": "rgba(236, 72, 153, 0.18)",
+        "tag_text": "#ec4899",
+        "graph_filter": "invert(0.9) hue-rotate(280deg) contrast(1.25) saturate(1.6)"
     },
     "📟 Emerald Terminal": {
-        "bg_gradient": "linear-gradient(135deg, #030a05 0%, #06180a 50%, #020603 100%)",
-        "sidebar_gradient": "linear-gradient(180deg, #06180a 0%, #030a05 100%)",
-        "text_color": "#4ade80",
-        "card_bg": "rgba(74, 222, 128, 0.03)",
-        "card_border": "1px solid rgba(74, 222, 128, 0.3)",
-        "accent_color": "#4ade80",
-        "accent_hover": "#22c55e",
-        "metric_val_gradient": "linear-gradient(135deg, #4ade80, #15803d)",
-        "chat_user_bg": "rgba(74, 222, 128, 0.1)",
-        "chat_user_border": "1px solid rgba(74, 222, 128, 0.4)",
+        "bg_gradient": "linear-gradient(135deg, #010602 0%, #030e05 50%, #010401 100%)",
+        "sidebar_gradient": "linear-gradient(180deg, #030e05 0%, #010602 100%)",
+        "text_color": "#22c55e",
+        "card_bg": "rgba(34, 197, 94, 0.03)",
+        "card_border": "1px solid rgba(34, 197, 94, 0.35)",
+        "accent_color": "#22c55e",
+        "accent_hover": "#15803d",
+        "metric_val_gradient": "linear-gradient(135deg, #22c55e, #166534)",
+        "chat_user_bg": "rgba(34, 197, 94, 0.12)",
+        "chat_user_border": "1px solid rgba(34, 197, 94, 0.45)",
         "chat_bot_bg": "rgba(255, 255, 255, 0.01)",
-        "chat_bot_border": "1px solid rgba(74, 222, 128, 0.15)",
-        "header_color": "#4ade80"
+        "chat_bot_border": "1px solid rgba(34, 197, 94, 0.18)",
+        "header_color": "#22c55e",
+        "tag_bg": "rgba(34, 197, 94, 0.18)",
+        "tag_text": "#22c55e",
+        "graph_filter": "invert(0.9) hue-rotate(85deg) contrast(1.25) saturate(2)"
     }
 }
 
@@ -112,6 +124,9 @@ def inject_custom_css(theme_name):
         --chat-b-bg: {t['chat_bot_bg']};
         --chat-b-border: {t['chat_bot_border']};
         --header-col: {t['header_color']};
+        --tag-bg: {t['tag_bg']};
+        --tag-text: {t['tag_text']};
+        --graph-filter: {t['graph_filter']};
     }}
     
     [data-testid="stAppViewContainer"] {{
@@ -123,7 +138,7 @@ def inject_custom_css(theme_name):
         border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
     }}
     
-    h1, h2, h3, h4, h5, h6, .stMarkdown p, .stMarkdown li, div, span, label {{
+    h1, h2, h3, h4, h5, h6, .stMarkdown p, .stMarkdown li, div, span, label, td, th {{
         color: var(--text-col) !important;
     }}
     
@@ -305,9 +320,64 @@ def inject_custom_css(theme_name):
         background: var(--accent-hov);
     }}
     
-    .stTextInput>div>div>input {{
-        background: rgba(255,255,255,0.03) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
+    /* --- Streamlit Element Overrides (Selectboxes, textareas, tags, buttons) --- */
+    div[data-baseweb="select"] {{
+        background-color: var(--card-bg) !important;
+        border: var(--card-border) !important;
+        border-radius: 8px !important;
+    }}
+    div[data-baseweb="select"] div {{
+        color: var(--text-col) !important;
+    }}
+    
+    /* Active Selected Tags in Multiselect */
+    span[data-baseweb="tag"] {{
+        background-color: var(--tag-bg) !important;
+        color: var(--tag-text) !important;
+        border: 1px solid var(--accent-col) !important;
+        border-radius: 4px !important;
+    }}
+    span[data-baseweb="tag"] span {{
+        color: var(--tag-text) !important;
+    }}
+    span[data-baseweb="tag"] svg {{
+        fill: var(--tag-text) !important;
+    }}
+    
+    /* Dropdown Options List */
+    div[data-baseweb="popover"] ul, ul[role="listbox"] {{
+        background-color: var(--side-grad) !important;
+        border: var(--card-border) !important;
+    }}
+    li[role="option"] {{
+        color: var(--text-col) !important;
+    }}
+    li[role="option"]:hover, li[data-highlighted="true"] {{
+        background-color: var(--accent-col) !important;
+        color: #000000 !important;
+    }}
+    
+    /* Chat Input Container */
+    div[data-testid="stChatInput"] {{
+        background-color: var(--card-bg) !important;
+        border: var(--card-border) !important;
+        border-radius: 24px !important;
+        padding: 4px 12px !important;
+    }}
+    div[data-testid="stChatInput"] textarea {{
+        background-color: transparent !important;
+        color: var(--text-col) !important;
+    }}
+    div[data-testid="stChatInput"] button {{
+        background-color: var(--accent-col) !important;
+        color: #000000 !important;
+        border-radius: 50% !important;
+    }}
+    
+    /* Text Inputs, Selectboxes, Textareas */
+    .stTextInput input, .stTextArea textarea, .stNumberInput input {{
+        background-color: var(--card-bg) !important;
+        border: var(--card-border) !important;
         color: var(--text-col) !important;
         border-radius: 8px !important;
     }}
@@ -319,8 +389,34 @@ def inject_custom_css(theme_name):
         color: var(--text-col) !important;
     }}
     
+    .stButton > button {{
+        background-color: var(--card-bg) !important;
+        border: var(--card-border) !important;
+        color: var(--text-col) !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+    }}
+    .stButton > button:hover {{
+        background-color: var(--accent-col) !important;
+        color: #000000 !important;
+        border-color: var(--accent-col) !important;
+        box-shadow: 0 0 10px var(--accent-col) !important;
+    }}
+    
+    /* --- Graph Iframe Alignment & Transparency Filter --- */
+    iframe[title="streamlit_agraph.agraph"] {{
+        background-color: transparent !important;
+        background: transparent !important;
+        border: var(--card-border) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15) !important;
+        filter: var(--graph-filter) !important;
+    }}
+    
     </style>
     """, unsafe_allow_html=True)
+
 
 # =============================================================================
 # API Helper Functions
@@ -376,13 +472,17 @@ TYPE_COLORS = {
 }
 
 def render_legend():
-    """Render entity type color legend."""
-    cols = st.columns(len(TYPE_COLORS))
-    for i, (etype, color) in enumerate(TYPE_COLORS.items()):
-        cols[i].markdown(
-            f'<span style="color:{color}; font-size:18px">●</span> {etype}',
-            unsafe_allow_html=True,
+    """Render entity type color legend as inline flex layout."""
+    legend_html = '<div style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-bottom: 15px;">'
+    for etype, color in TYPE_COLORS.items():
+        legend_html += (
+            f'<div style="display: flex; align-items: center; font-size: 0.9rem; font-weight: 500;">'
+            f'  <span style="color:{color}; font-size: 1.25rem; margin-right: 6px;">●</span>{etype}'
+            f'</div>'
         )
+    legend_html += '</div>'
+    st.markdown(legend_html, unsafe_allow_html=True)
+
 
 # =============================================================================
 # Sidebar — Navigation + System Status & Theme Engine
@@ -634,6 +734,7 @@ elif page == "🕸️ Knowledge Graph":
                     hierarchical=(layout_type == "Hierarchical"),
                     nodeHighlightBehavior=True,
                     highlightColor="#ff007f",
+                    background="rgba(0,0,0,0)"
                 )
                 clicked_node = agraph(nodes=ag_nodes, edges=ag_edges, config=config)
 
@@ -838,7 +939,8 @@ elif page == "💬 Chat":
                         directed=True,
                         physics=True,
                         hierarchical=False,
-                        nodeHighlightBehavior=True
+                        nodeHighlightBehavior=True,
+                        background="rgba(0,0,0,0)"
                     )
                     agraph(nodes=sub_nodes, edges=sub_edges, config=sub_config)
             else:
